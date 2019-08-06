@@ -11,6 +11,7 @@ function [I_seg, I_crop, probShadow] = peakShadowBone(I, freq_mode, crop_mode)
 %%% crop_mode = 0 - no cropping, better for reconstructed volumes from
 %%% tracking data
 
+I = gpuArray(I);
 I = imnorm(single(I));
 
 [rows, cols, frames] = size(I);
@@ -92,6 +93,7 @@ probShadow = imnorm(probShad);
 
 [maxI, index] = max(I.*probShad);
 I_seg = zeros(size(I));
+I_seg = gpuArray(I_seg);
 
 if frames == 1
     indices = index + (0:size(I,1):size(I,1)*(size(I,2)-1));
@@ -104,6 +106,10 @@ I_seg = I_seg - min(I_seg(:));
 I_seg = I_seg/max(I_seg(:));
 I_seg(I_seg < (mean(nonzeros(I_seg(:))) - 0.5*std(nonzeros(I_seg(:))))) = 0;
 I_seg = I_seg > 0.05;
+
+%Convert back to CPU array
+I_seg = gather(I_seg);
+
 
 %%% To dilate final segmentation, uncomment below
 % SE = strel('line',2,90);
