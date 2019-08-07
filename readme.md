@@ -1,4 +1,4 @@
-# Shadow Peak bone segmentation
+# Shadow Peak Ultrasound Bone Segmentation
 
 This repository contains code to perform automatic 3D bone segmentation, as published in our paper
 
