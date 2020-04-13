@@ -1,4 +1,4 @@
-function [I_seg, I_crop, probShadow] = peakShadowBone(I, freq_mode, crop_mode)
+function [I_seg, I_crop, probShad] = peakShadowBone(I, freq_mode, crop_mode)
 
 %%% This is ultrasound bone segmentation in function format (script in peakShadowSeg.m
 %%% file.
@@ -11,7 +11,11 @@ function [I_seg, I_crop, probShadow] = peakShadowBone(I, freq_mode, crop_mode)
 %%% crop_mode = 0 - no cropping, better for reconstructed volumes from
 %%% tracking data
 
-I = gpuArray(I);
+try
+    I = gpuArray(I);
+catch
+    warning('Could not use GPU, using CPU...')
+end
 I = imnorm(single(I));
 
 [rows, cols, frames] = size(I);
@@ -32,7 +36,7 @@ elseif crop_mode ~= 1 && crop_mode ~= 0
     error('invalid crop mode set');
 end
 
-I_crop = I;
+I_crop = gather(I);
 
 [rows, cols, frames] = size(I);
 
@@ -51,7 +55,7 @@ I_crop = I;
 % end
 
 % I = imgaussfilt3(I, [1,1,1]);   %3D gaussian filtering with std of 6, for phantom data use [1 1 1], DDH data [4 4 1]
-gauss_std = [4,4,1];
+gauss_std = [2,2,1];
 I = imgaussfilt3(I, gauss_std);   %3D gaussian filtering with std of 6, for phantom data use [1 1 1], DDH data [4 4 1]
 % % %I_filt = imguidedfilter(I, 'NeighborhoodSize', [6 6]);
 I = I - min(I(:));
@@ -67,7 +71,9 @@ else
     probShad = 1 - sqrt(cumSum./intSum);
 end
 
-probShadow = imnorm(probShad);
+intSum = gather(intSum);
+
+probShad = imnorm(probShad);
 
 
 %%%experimental: add depth gain compensation%%%
@@ -92,8 +98,12 @@ probShadow = imnorm(probShad);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 [maxI, index] = max(I.*probShad);
-I_seg = zeros(size(I));
-I_seg = gpuArray(I_seg);
+I_seg = single(zeros(size(I)));
+
+try
+    I_seg = gpuArray(I_seg);
+catch
+end
 
 if frames == 1
     indices = index + (0:size(I,1):size(I,1)*(size(I,2)-1));
@@ -101,11 +111,14 @@ else
     indices = index(:)' + (0:size(I,1):size(I,1)*size(I,2)*size(I,3)-1);
 end
 
+index = gather(index);
+
 I_seg(indices) = maxI;
 I_seg = I_seg - min(I_seg(:));
 I_seg = I_seg/max(I_seg(:));
 I_seg(I_seg < (mean(nonzeros(I_seg(:))) - 0.5*std(nonzeros(I_seg(:))))) = 0;
-I_seg = I_seg > 0.05;
+
+% I_seg = I_seg > 0.05;
 
 %Convert back to CPU array
 I_seg = gather(I_seg);
